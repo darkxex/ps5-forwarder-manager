@@ -36,6 +36,7 @@ struct Target
     // flag is --exit-after-stream.
     bool stream = false;
     Feature feature = Feature::none; // offered only while this flag is on
+    bool rom_folder = false;         // the ROM may also be a folder (a game kept extracted)
 };
 
 // The built-in emulator targets the site offers, plus "generic", without the
@@ -54,7 +55,7 @@ struct Forwarder
     std::string title_id;     // PPSA99xxx (the folder name)
     std::string display_name; // shown under the tile
     std::string target;       // title ID of the app to launch
-    std::string rom;          // ROM file path/name passed as --rom (optional)
+    std::string rom;          // ROM file (or folder) path/name passed as --rom (optional)
     std::string pc;           // streaming target: the saved PC (optional: the last one used)
     std::string app;          // streaming target: the app to start on that PC
     bool exit_after_game = false;

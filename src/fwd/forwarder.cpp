@@ -38,7 +38,7 @@ std::vector<Target> known_targets()
         {"PPSA99008", "ProsperoEden", true, true}, // Nintendo Switch (Eden)
         {"PPSA99764", "Porpoise", true, false},    // GameCube / Wii (RetroArch)
         {"PPSA99203", "PS5SX2", true, false},      // PlayStation 2 (PCSX2)
-        {"PPSA50011", "PS5X360", true, false},     // Xbox 360 (Xenia)
+        {"PPSA50011", "PS5X360", true, false, false, Feature::none, true},     // Xbox 360 (Xenia)
         {"PPSA00000", "Payload", true, false, false, Feature::payload_target}, // ELF payloads
         {"PPSA99002", "ProsperoLight", false, true, true}, // Moonlight/Sunshine streaming
         {"", "Generic (enter a title ID)", false, false},

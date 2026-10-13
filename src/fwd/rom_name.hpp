@@ -1,4 +1,4 @@
-// ps5fwdgen - A display name suggested by a ROM file's name.
+// ps5fwdgen - A display name suggested by a ROM file's (or folder's) name.
 // Copyright (C) 2026 heydemoura
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
@@ -12,13 +12,18 @@ namespace fwd
 
 // The file name without its folder and last extension, trimmed and cut to
 // at most max_chars UTF-8 characters: "/data/roms/Super Game.nsp" ->
-// "Super Game". A leading dot is part of the name (".nsp" stays ".nsp").
+// "Super Game". A leading dot is part of the name (".nsp" stays ".nsp"). A
+// path ending in '/' is a game kept as a folder, whose whole name is kept:
+// "/data/x360/Halo 3 v1.1/" -> "Halo 3 v1.1".
 inline std::string name_from_rom(std::string_view path, std::size_t max_chars = 60)
 {
+    const bool folder = !path.empty() && path.back() == '/';
+    while (!path.empty() && path.back() == '/')
+        path.remove_suffix(1);
     const std::size_t slash = path.find_last_of('/');
     if (slash != std::string_view::npos)
         path.remove_prefix(slash + 1);
-    const std::size_t dot = path.find_last_of('.');
+    const std::size_t dot = folder ? std::string_view::npos : path.find_last_of('.');
     if (dot != std::string_view::npos && dot > 0)
         path = path.substr(0, dot);
     while (!path.empty() && (path.front() == ' ' || path.front() == '\t'))

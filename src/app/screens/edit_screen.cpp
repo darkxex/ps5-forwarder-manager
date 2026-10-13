@@ -490,18 +490,23 @@ class EditScreen final : public Screen
             break;
         case RowRom:
         {
+            // A target that runs games kept as folders (PS5X360) can pick a
+            // folder too; it is passed by name like a file.
             EditScreen *self = this;
             context.push(make_file_picker_screen(
                 context, "/data", {},
                 [self](const std::string &path)
                 {
-                    const std::size_t slash = path.find_last_of('/');
-                    self->forwarder_.rom =
-                        slash == std::string::npos ? path : path.substr(slash + 1);
+                    std::string rom = path;
+                    while (rom.size() > 1 && rom.back() == '/') // a picked folder
+                        rom.pop_back();
+                    const std::size_t slash = rom.find_last_of('/');
+                    self->forwarder_.rom = slash == std::string::npos ? rom : rom.substr(slash + 1);
                     if (self->forwarder_.display_name.empty())
-                        self->forwarder_.display_name = name_from_rom(self->forwarder_.rom);
+                        self->forwarder_.display_name = name_from_rom(path);
                     self->dirty_ = true;
-                }));
+                },
+                current_target().rom_folder));
             break;
         }
         case RowIcon:

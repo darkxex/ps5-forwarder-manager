@@ -16,8 +16,11 @@ struct Context;
 
 // Opens at start_dir. extensions is a set of lower-case suffixes (".nsp",
 // ".iso"); empty means every file. on_pick is called with the chosen absolute
-// path, then the picker pops itself.
+// path, then the picker pops itself. With folders, every folder but the root
+// also offers "Use this folder", which reports the folder's absolute path with
+// a trailing slash ("/data/x360/Halo 3/").
 std::unique_ptr<Screen> make_file_picker_screen(Context &context, std::string start_dir,
                                                 std::vector<std::string> extensions,
-                                                std::function<void(const std::string &)> on_pick);
+                                                std::function<void(const std::string &)> on_pick,
+                                                bool folders = false);
 } // namespace fwd
