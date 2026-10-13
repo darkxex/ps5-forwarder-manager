@@ -210,6 +210,7 @@ int main()
     std::int64_t last_frame_start = sys::monotonic_us();
     gfx::Canvas shot_canvas;
     bool shot_pending = false;
+    std::uint32_t dev_held = 0; // buttons the scripted input holds down
     int shot_index = 0;
     constexpr int kShotW = 1920;
     constexpr int kShotH = 1080;
@@ -229,6 +230,7 @@ int main()
         if (dev.kind == dev_input::Kind::button)
         {
             input = dev.frame;
+            dev_held = dev.frame.held;
         }
         else if (dev.kind == dev_input::Kind::text)
         {
@@ -244,6 +246,7 @@ int main()
         {
             shot_pending = true;
             input.connected = true;
+            input.held = dev_held; // a scripted hold stays down for the picture
         }
         else
         {

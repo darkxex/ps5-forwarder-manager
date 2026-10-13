@@ -50,6 +50,8 @@ constexpr float kCardGap = 28.0f;
 constexpr float kCardGrow = 1.18f;
 constexpr float kShelfY = 724.0f;
 constexpr float kHeroTextWidth = 1180.0f;
+// Holding Circle this long on the home screen closes the app (as ProsperoLight does).
+constexpr float kCloseHold = 3.0f;
 
 extern "C" void glDeleteTextures(int n, const unsigned int *textures);
 
@@ -80,6 +82,7 @@ class HomeScreen final : public Screen
 
     void enter(Context &context) override
     {
+        close_hold_ = -1.0f;
         rescan(context);
     }
 
@@ -208,6 +211,23 @@ class HomeScreen final : public Screen
         clock_ += dt;
         age_ += dt;
 
+        // Hold Circle to close the app. The press must start here: a Circle
+        // still held from closing another screen does not count.
+        if (input.connected && !input.focus_lost && input.is_held(hui::Action::back))
+        {
+            if (close_hold_ < 0.0f && input.is_pressed(hui::Action::back))
+                close_hold_ = 0.0f;
+            else if (close_hold_ >= 0.0f)
+                close_hold_ += dt;
+        }
+        else
+            close_hold_ = -1.0f;
+        if (close_hold_ >= kCloseHold)
+        {
+            context.quit = true;
+            return;
+        }
+
         if (!context.elevated)
         {
             if (input.is_pressed(hui::Action::menu))
@@ -322,14 +342,31 @@ class HomeScreen final : public Screen
     bool draw(Context &context, hui::ui::Canvas &scene, hui::ui::Canvas &overlay) const override
     {
         if (!context.elevated)
-            return draw_not_elevated(context, scene, overlay);
+        {
+            const bool glass = draw_not_elevated(context, scene, overlay);
+            draw_close_hold(context, scene.list);
+            return glass;
+        }
 
         (void)overlay;
         hui::gfx::DrawList &list = scene.list;
         draw_header(context, list);
         draw_hero(context, list);
         draw_shelf(context, list);
+        draw_close_hold(context, list);
         return false;
+    }
+
+    // ProsperoLight's bar: a plate at the bottom that fills while Circle is held.
+    void draw_close_hold(Context &context, hui::gfx::DrawList &list) const
+    {
+        if (close_hold_ <= 0.0f)
+            return;
+        const float progress = std::min(1.0f, close_hold_ / kCloseHold);
+        list.rounded_rect({640, 930, 640, 100}, 16, Color::rgb(0x09172c));
+        hui::ui::text(list, context.fonts.semibold, "Hold to close app", 664, 966, 24, kWhite);
+        list.rounded_rect({664, 988, 592, 14}, 7, kWhite.with_alpha(0.25f));
+        list.rounded_rect({664, 988, 592 * progress, 14}, 7, context.theme.primary);
     }
 
     void backdrop(Context &context, hui::gfx::BackdropSpec &spec) const override
@@ -523,9 +560,10 @@ class HomeScreen final : public Screen
         const hui::ui::Hint hints[] = {
             {hui::ui::Button::cross, is_create(focus_) ? "Create" : "Edit"},
             {hui::ui::Button::triangle, "New"},
-            {hui::ui::Button::options, "Settings"}};
+            {hui::ui::Button::options, "Settings"},
+            {hui::ui::Button::circle, "Hold to close app"}};
         list.push_opacity(in);
-        hui::ui::draw_hints(list, fonts, hui::ui::GlyphStyle::dark(), hints, 3, 1824, true);
+        hui::ui::draw_hints(list, fonts, hui::ui::GlyphStyle::dark(), hints, 4, 1824, true);
         list.pop_opacity();
     }
 
@@ -565,6 +603,7 @@ class HomeScreen final : public Screen
     int shown_ = 0;
     int previous_ = 0;
     float clock_ = 0.0f;
+    float close_hold_ = -1.0f; // seconds Circle has been held here; negative: not held
     float age_ = 0.0f;
     hui::tween::Timer hero_;
     hui::ui::SpringColor palette_[4];
