@@ -163,7 +163,7 @@ Because the build host has no controller, the app carries a dev-only harness
 that is inert unless trigger files exist under `/data/ps5fwdgen-dev/`:
 
 - `input.txt` - a line-per-command script (`up`/`down`/`cross`/`type:<text>`/
-  `wait N`/`shot`/`quit`) fed as synthetic input to the real screens, consumed
+  `wait N`/`hold <button> N`/`shot`/`quit`) fed as synthetic input to the real screens, consumed
   once. `shot` saves a 1920x1080 PNG to the app's `download0`.
 - `selftest.txt` - runs the real `write_forwarder()` once with test values.
 

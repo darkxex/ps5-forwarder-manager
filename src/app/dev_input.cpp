@@ -103,6 +103,28 @@ Command parse_line(const std::string &line)
     return command; // unknown -> skipped
 }
 
+// "hold NAME N": NAME pressed, then kept down for N frames in all. The next
+// line releases it (a "shot" keeps it down, to capture what holding shows).
+void queue_hold(const std::string &line)
+{
+    char name[16] = {};
+    int frames = 1;
+    if (std::sscanf(line.c_str() + 5, "%15s %d", name, &frames) < 1)
+        return;
+    const Command press = parse_line(name);
+    if (press.kind != Kind::button || press.frame.pressed == 0)
+        return;
+    frames = frames < 1 ? 1 : (frames > 600 ? 600 : frames);
+    g_queue.push_back(press);
+    for (int i = 1; i < frames; ++i)
+    {
+        Command held = press;
+        held.frame.pressed = 0;
+        held.frame.nav = hui::Direction::none;
+        g_queue.push_back(held);
+    }
+}
+
 } // namespace
 
 void poll()
@@ -131,7 +153,9 @@ void poll()
         while (lead < line.size() && line[lead] == ' ')
             ++lead;
         line = line.substr(lead);
-        if (!line.empty())
+        if (line.rfind("hold ", 0) == 0)
+            queue_hold(line);
+        else if (!line.empty())
             g_queue.push_back(parse_line(line));
         if (end == text.size())
             break;
