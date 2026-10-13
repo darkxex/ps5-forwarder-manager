@@ -46,6 +46,11 @@ ifneq ($(strip $(STEAMGRIDDB_API_KEY)),)
 override APP_DEFINITIONS := $(strip STEAMGRIDDB_API_KEY=$(STEAMGRIDDB_API_KEY) $(APP_DEFINITIONS))
 endif
 export STEAMGRIDDB_API_KEY
+
+# Feature flags (src/fwd/features.hpp): FEATURES="PAYLOAD_TARGET=1" turns a flag
+# on for this build; each NAME=VALUE becomes FWD_FEATURE_NAME=VALUE.
+FEATURES ?=
+override APP_DEFINITIONS := $(strip $(addprefix FWD_FEATURE_,$(FEATURES)) $(APP_DEFINITIONS))
 PACBREW_PACKAGES ?=
 # SteamGridDB and the online AT9 conversion use libcurl.
 override PACBREW_PACKAGES := $(strip libcurl $(filter-out libcurl,$(PACBREW_PACKAGES)))
@@ -123,7 +128,7 @@ opengl:
 	@printf '%s\n' '==> [opengl] Preparing the ps5-opengl SDK link group'
 	@bash tools/prepare-opengl.sh
 
-.PHONY: all app build init doctor test test-deps test-unit test-integration libc deps pacbrew pacbrew-list assets-check format format-check tidy lint check ffpkg ffpfsc packages sandbox-elevation-example sandbox-elevation-ffpfsc update-check-example test-update-check test-rom-name self-update-helper self-update-example test-self-update deploy undeploy clean distclean help
+.PHONY: all app build init doctor test test-deps test-unit test-integration libc deps pacbrew pacbrew-list assets-check format format-check tidy lint check ffpkg ffpfsc packages sandbox-elevation-example sandbox-elevation-ffpfsc update-check-example test-update-check test-rom-name test-features self-update-helper self-update-example test-self-update deploy undeploy clean distclean help
 
 all: app
 build: app
@@ -136,7 +141,7 @@ doctor:
 	@printf '%s\n' '==> [doctor] Checking the Linux/WSL host without changing it'
 	@bash tools/doctor.sh
 
-test: test-unit test-integration test-elevation test-update-check test-self-update test-rom-name
+test: test-unit test-integration test-elevation test-update-check test-self-update test-rom-name test-features
 
 .PHONY: app-assets
 # Rebuild the app's own sce_sys presentation assets (icon0.png, pic0.dds,
@@ -169,6 +174,17 @@ test-update-check:
 		tests/test_update_check.cpp $(HOST_TEST_LDFLAGS) -o build/tests/test_update_check
 	@build/tests/test_update_check
 	@printf '%s\n' 'Update-check version, parsing and decision checks passed.'
+test-features:
+	@mkdir -p build/tests
+	@$(HOST_CC) -Iexternal/ps5-forwarder-format/include -c external/ps5-forwarder-format/src/psfwd.c \
+		-o build/tests/psfwd.o
+	@for payload in 0 1; do \
+		$(HOST_CXX) $(HOST_TEST_CXXFLAGS) -Isrc -Iexternal/ps5-forwarder-format/include \
+			-DFWD_FEATURE_PAYLOAD_TARGET=$$payload -DEXPECT_PAYLOAD=$$payload \
+			tests/test_features.cpp src/fwd/forwarder.cpp build/tests/psfwd.o $(HOST_TEST_LDFLAGS) \
+			-o build/tests/test_features_$$payload && build/tests/test_features_$$payload || exit 1; \
+	done
+
 test-rom-name:
 	@mkdir -p build/tests
 	@$(HOST_CXX) $(HOST_TEST_CXXFLAGS) -Isrc -g -fsanitize=address,undefined -fno-sanitize-recover=all \
