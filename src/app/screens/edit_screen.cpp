@@ -6,6 +6,7 @@
 // Copyright (C) 2026 heydemoura
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "app/keyboard_prompt.hpp"
 #include "app/screens/edit_screen.hpp"
 
 #include "app/context.hpp"
@@ -124,11 +125,7 @@ class EditScreen final : public Screen
         form_.set_bounds(kFormBounds);
         form_.set_active(true);
         build(context);
-        {
-            auto kb = hui::ui::KeyboardBindings::standard();
-            kb.done = hui::Action::page_next; // R1 confirms (a console keyboard nicety)
-            prompt_.keyboard.style.bindings = kb;
-        }
+        bind_keyboard_prompt(prompt_); // R2 confirms
         prompt_.style.buttons = false; // single Done: the keyboard's own key (closes on press)
     }
 
@@ -148,7 +145,7 @@ class EditScreen final : public Screen
         form_.style.dividers = false;
         dialog_.style.theme = context.theme;
         toasts_.style.theme = context.theme;
-        prompt_.style.theme = context.theme;
+        style_keyboard_prompt(prompt_, context.theme);
     }
 
     static int index_for_target(const std::string &id)

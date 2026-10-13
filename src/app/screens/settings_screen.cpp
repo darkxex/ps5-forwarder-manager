@@ -7,6 +7,7 @@
 // match the home screen's design language, so there is no theme option.
 
 #include "platform/launcher_inject.hpp"
+#include "app/keyboard_prompt.hpp"
 #include "app/screens/settings_screen.hpp"
 
 #include "app/context.hpp"
@@ -43,11 +44,7 @@ class SettingsScreen final : public Screen
         restyle(context);
         form_.set_bounds(kFormBounds);
         form_.set_active(true);
-        {
-            auto kb = hui::ui::KeyboardBindings::standard();
-            kb.done = hui::Action::page_next; // R1 confirms
-            prompt_.keyboard.style.bindings = kb;
-        }
+        bind_keyboard_prompt(prompt_); // R2 confirms
         prompt_.style.buttons = false; // single Done
         build(context);
     }
@@ -56,7 +53,7 @@ class SettingsScreen final : public Screen
     {
         form_.style.theme = context.theme;
         form_.style.panel = true;
-        prompt_.style.theme = context.theme;
+        style_keyboard_prompt(prompt_, context.theme);
     }
 
     void build(Context &context)
