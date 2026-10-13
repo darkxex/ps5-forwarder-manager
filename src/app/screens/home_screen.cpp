@@ -15,7 +15,7 @@
 #include "app/tile.hpp"
 #include "core/tween.hpp"
 #include "fwd/store.hpp"
-#include "fwd/x360_library.hpp"
+#include "fwd/library_game.hpp"
 #include "gfx/gl_batch.hpp"
 #include "gfx/backdrop_spec.hpp"
 #include "gfx/renderer.hpp"
@@ -487,12 +487,13 @@ class HomeScreen final : public Screen
                                         24.0f, kHeroTextWidth),
                 x, 414, 24, kWhite.with_alpha(0.7f));
         else if (!f.rom.empty())
-            hui::ui::text(list, fonts.regular,
-                          fonts.regular.font->fit(takes_game_path(f.target)
-                                                      ? "Game: " + x360_game_name(f.rom)
-                                                      : "ROM: " + f.rom,
-                                                  24.0f, kHeroTextWidth),
-                          x, 414, 24, kWhite.with_alpha(0.7f));
+            hui::ui::text(
+                list, fonts.regular,
+                fonts.regular.font->fit(library_of(f.target) != GameLibrary::none
+                                            ? "Game: " + library_game_name(f.target, f.rom)
+                                            : "ROM: " + f.rom,
+                                        24.0f, kHeroTextWidth),
+                x, 414, 24, kWhite.with_alpha(0.7f));
         if (f.exit_after_game)
             hui::ui::text(list, fonts.regular,
                           is_stream_target(f.target) ? "Exits when the stream ends"

@@ -48,6 +48,14 @@ The screenshots use demo forwarders for freeware and open-source games.
   disc, including `<Game>\Xbox360TOC.txt`, which some extraction and upload
   tools skip. PS5X360's detailed logs (stream on TCP 9100) name the missing
   file (`open-failed ... path=`).
+- Makes tiles for PlayStation games played with
+  [SwanStationPS5](https://github.com/darkxex/SwanStationPS5): pick a game from
+  the ones it finds in its game folders (`/data/SwanStationPS5/games`,
+  `/data/PSXS5/games`, and `SwanStationPS5` / `PSXS5` on USB and extended
+  storage), with its cover as the tile icon. The tile starts it with
+  `--rom <full path>` and, optionally, `--exit-after-game`; SwanStationPS5
+  needs to accept those arguments, which it does from the version that adds
+  forwarder support.
 - Writes a complete tile folder (shared `eboot.bin` + `libc.prx`,
   `forwarder.json`, `sce_sys/param.json`, art) that ShadowMountPlus registers.
 

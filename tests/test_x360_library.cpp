@@ -77,9 +77,9 @@ std::vector<unsigned char> package(std::uint32_t type, const std::string &name,
     return bytes;
 }
 
-const fwd::X360Game *find(const std::vector<fwd::X360Game> &games, const std::string &name)
+const fwd::LibraryGame *find(const std::vector<fwd::LibraryGame> &games, const std::string &name)
 {
-    for (const fwd::X360Game &game : games)
+    for (const fwd::LibraryGame &game : games)
         if (game.name == name)
             return &game;
     return nullptr;
@@ -133,34 +133,34 @@ int main()
     expect(paths.back() == root + "/extra", "the install's extra path, trimmed");
     expect(fwd::x360_game_paths("").size() == 6, "defaults only without an install");
 
-    const std::vector<fwd::X360Game> games =
+    const std::vector<fwd::LibraryGame> games =
         fwd::read_x360_library(install, {"/app0/assets/roms", library, root + "/missing"});
     expect(games.size() == 6, "six games");
 
-    const fwd::X360Game *halo = find(games, "Halo 3 v1.1");
+    const fwd::LibraryGame *halo = find(games, "Halo 3 v1.1");
     expect(halo != nullptr && halo->kind == "XEX" &&
                halo->path == library + "/Halo 3 v1.1/default.xex" &&
                halo->cover == library + "/Halo 3 v1.1/cover.jpg",
            "extracted game: default.xex and its cover");
     expect(find(games, "Inner") == nullptr, "nothing below a game is another game");
-    const fwd::X360Game *single = find(games, "Single");
+    const fwd::LibraryGame *single = find(games, "Single");
     expect(single != nullptr && single->path == library + "/Single/game.xex" &&
                single->cover.empty(),
            "a single .xex of any name");
     expect(find(games, "Two") == nullptr, "two executables: not a game");
     expect(find(games, "Shallow") != nullptr && find(games, "Deep") == nullptr,
            "six levels down and no further");
-    const fwd::X360Game *disc = find(games, "Disc Game");
+    const fwd::LibraryGame *disc = find(games, "Disc Game");
     expect(disc != nullptr && disc->kind == "ISO" && disc->cover == library + "/Disc Game.png",
            "disc image and its cover");
     expect(find(games, "Hidden") == nullptr, "a package's data folder is skipped");
-    const fwd::X360Game *arcade = find(games, "Arcade Hit");
+    const fwd::LibraryGame *arcade = find(games, "Arcade Hit");
     expect(arcade != nullptr && arcade->kind == "GOD/STFS" && arcade->path == library + "/ARCADE01",
            "a game package by its own name");
     expect(find(games, "A save") == nullptr, "a save is not a game");
     const std::vector<unsigned char> thumbnail = fwd::x360_package_thumbnail(library + "/ARCADE01");
     expect(std::string(thumbnail.begin(), thumbnail.end()) == "PNGDATA", "package thumbnail");
-    const fwd::X360Game *rom = find(games, "Rom Game");
+    const fwd::LibraryGame *rom = find(games, "Rom Game");
     expect(rom != nullptr && rom->path == "/app0/assets/roms/Rom Game/default.xex" &&
                rom->location == install + "/assets/roms/Rom Game/default.xex",
            "a game in the install is given as /app0");

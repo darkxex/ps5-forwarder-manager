@@ -24,6 +24,15 @@ struct Argument
     std::string value;
 };
 
+// Whose game list the edit screen offers for a target (fwd/x360_library.hpp,
+// fwd/psx_library.hpp); none: a ROM file is picked from the file browser.
+enum class GameLibrary : std::uint8_t
+{
+    none,
+    x360, // PS5X360
+    psx,  // SwanStationPS5
+};
+
 // A known target app, for the picker.
 struct Target
 {
@@ -39,6 +48,7 @@ struct Target
     // Takes the game as its only argument, a full path, instead of --rom
     // (PS5X360, see fwd/x360_library.hpp).
     bool game_path = false;
+    GameLibrary library = GameLibrary::none; // games listed for it, given by full path
 };
 
 // The built-in emulator targets the site offers, plus "generic", without the
@@ -51,6 +61,9 @@ bool is_stream_target(const std::string &title_id);
 
 // True when the target takes the game's full path as its only argument.
 bool takes_game_path(const std::string &title_id);
+
+// The emulator's game list the target is picked from; none for a ROM file.
+GameLibrary library_of(const std::string &title_id);
 
 // A friendly name for a target title ID (emulator name, or the ID itself).
 std::string target_display_name(const std::string &title_id);

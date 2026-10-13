@@ -22,6 +22,8 @@
 // a file or folder pick for those.
 #pragma once
 
+#include "fwd/library_game.hpp"
+
 #include <string>
 #include <vector>
 
@@ -29,15 +31,6 @@ namespace fwd
 {
 
 inline constexpr char kX360TitleId[] = "PPSA50011";
-
-struct X360Game
-{
-    std::string name;     // the folder's, the image's or the package's own name
-    std::string path;     // what PS5X360 is given: the .xex, the .iso or the package
-    std::string kind;     // "XEX", "ISO" or "GOD/STFS", as PS5X360 says
-    std::string cover;    // a cover image beside the game, if any
-    std::string location; // the file this app reads (path, unless under /app0)
-};
 
 // Where PS5X360 is installed (its /app0); empty when it is not found. Looks
 // in forwarders_root/PPSA50011, then in every folder of forwarders_root.
@@ -47,8 +40,8 @@ std::string find_x360_install(const std::string &forwarders_root);
 std::vector<std::string> x360_game_paths(const std::string &install);
 
 // Every game in those folders, by name. install maps /app0; empty skips it.
-std::vector<X360Game> read_x360_library(const std::string &install,
-                                        const std::vector<std::string> &game_paths);
+std::vector<LibraryGame> read_x360_library(const std::string &install,
+                                           const std::vector<std::string> &game_paths);
 
 // The executable of a game kept as a folder: default.xex, or the only .xex in
 // it. Empty when the folder holds none or several.

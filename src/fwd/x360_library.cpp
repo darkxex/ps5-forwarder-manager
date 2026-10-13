@@ -230,7 +230,7 @@ std::string cover_beside(const std::string &location, const std::string &kind)
 class Scanner
 {
   public:
-    Scanner(const std::string &install, std::vector<X360Game> &games)
+    Scanner(const std::string &install, std::vector<LibraryGame> &games)
         : install_(install), games_(games)
     {
     }
@@ -270,7 +270,7 @@ class Scanner
     {
         if (!seen_.insert(location).second)
             return;
-        X360Game game;
+        LibraryGame game;
         game.name = name;
         game.location = location;
         game.path = x360_path_for(install_, location);
@@ -280,7 +280,7 @@ class Scanner
     }
 
     const std::string &install_;
-    std::vector<X360Game> &games_;
+    std::vector<LibraryGame> &games_;
     std::set<std::string> seen_;
 };
 
@@ -333,10 +333,10 @@ std::vector<std::string> x360_game_paths(const std::string &install)
     return paths;
 }
 
-std::vector<X360Game> read_x360_library(const std::string &install,
-                                        const std::vector<std::string> &game_paths)
+std::vector<LibraryGame> read_x360_library(const std::string &install,
+                                           const std::vector<std::string> &game_paths)
 {
-    std::vector<X360Game> games;
+    std::vector<LibraryGame> games;
     Scanner scanner(install, games);
     for (const std::string &configured : game_paths)
     {
@@ -350,7 +350,7 @@ std::vector<X360Game> read_x360_library(const std::string &install,
         if (is_dir(root))
             scanner.scan(root, 0, root);
     }
-    std::stable_sort(games.begin(), games.end(), [](const X360Game &a, const X360Game &b)
+    std::stable_sort(games.begin(), games.end(), [](const LibraryGame &a, const LibraryGame &b)
                      { return lower(a.name) < lower(b.name); });
     return games;
 }

@@ -39,6 +39,14 @@ bool takes_game_path(const std::string &title_id)
     return false;
 }
 
+GameLibrary library_of(const std::string &title_id)
+{
+    for (const Target &target : known_targets())
+        if (title_id == target.title_id && target.title_id[0] != '\0')
+            return target.library;
+    return GameLibrary::none;
+}
+
 std::vector<Target> known_targets()
 {
     // The target apps PS5 Forwarder Builder supports (from ps5-forwarder.mph.am):
@@ -46,7 +54,10 @@ std::vector<Target> known_targets()
         {"PPSA99008", "ProsperoEden", true, true}, // Nintendo Switch (Eden)
         {"PPSA99764", "Porpoise", true, false},    // GameCube / Wii (RetroArch)
         {"PPSA99203", "PS5SX2", true, false},      // PlayStation 2 (PCSX2)
-        {"PPSA50011", "PS5X360", true, false, false, Feature::none, true},     // Xbox 360 (Xenia)
+        {"PPSA50011", "PS5X360", true, false, false, Feature::none, true,
+         GameLibrary::x360}, // Xbox 360
+        {"PPSA98510", "SwanStation", true, true, false, Feature::none, false,
+         GameLibrary::psx}, // PlayStation (SwanStationPS5)
         {"PPSA00000", "Payload", true, false, false, Feature::payload_target}, // ELF payloads
         {"PPSA99002", "ProsperoLight", false, true, true}, // Moonlight/Sunshine streaming
         {"", "Generic (enter a title ID)", false, false},
