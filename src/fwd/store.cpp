@@ -36,6 +36,10 @@ bool is_dir(const std::string &path)
 void split_args(const psfwd_info &info, Forwarder &out)
 {
     int i = 0;
+    // A target that takes the game's path has it first, alone.
+    if (takes_game_path(out.target) && info.argc > 0 &&
+        std::string(info.argv[0]).rfind("--", 0) != 0)
+        out.rom = info.argv[i++];
     while (i < info.argc)
     {
         const std::string key = info.argv[i];

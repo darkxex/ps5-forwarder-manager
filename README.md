@@ -33,6 +33,21 @@ The screenshots use demo forwarders for freeware and open-source games.
   becomes the tile icon. The tile starts the stream by itself (`--pc`, `--app`,
   `--exit-after-stream`). The lists are what ProsperoLight keeps under
   `/data/prosperolight/forwarder`; without them the PC and app are typed.
+- Makes tiles for Xbox 360 games played with
+  [PS5X360](https://github.com/BrinooTk/PS5X360): pick a game from the ones it
+  finds in its default game folders (`/data/xbox360`, `xbox360` on USB and
+  extended storage, its own `assets/roms`), with its cover or package
+  thumbnail as the tile icon. Extracted games (`default.xex`), `.iso` images
+  and Games on Demand/XBLA packages are found the way PS5X360 finds them. A
+  game in a folder added in PS5X360's own settings, which other apps cannot
+  read, is picked as a file or folder instead. The tile gives PS5X360 the
+  game's full path as its only argument, which is how it starts a game; it
+  takes no `--rom` and has no exit-after-game option. If the game then drops
+  back to PS5X360's library with "Disc read failure", the game's data is
+  incomplete, not the tile: Unreal Engine 3 games need every file of the
+  disc, including `<Game>\Xbox360TOC.txt`, which some extraction and upload
+  tools skip. PS5X360's detailed logs (stream on TCP 9100) name the missing
+  file (`open-failed ... path=`).
 - Writes a complete tile folder (shared `eboot.bin` + `libc.prx`,
   `forwarder.json`, `sce_sys/param.json`, art) that ShadowMountPlus registers.
 

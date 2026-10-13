@@ -39,6 +39,11 @@ int main()
     check("  spaced name  .iso", "spaced name");
     check("Pokémon Edição.xci", "Pokémon Edição");
     check("", "");
+    // A game kept as a folder (a trailing slash) keeps its dots.
+    check("/data/x360/Halo 3/", "Halo 3");
+    check("/data/x360/Halo 3 v1.1/", "Halo 3 v1.1");
+    check("Gears.of.War//", "Gears.of.War");
+    check("/", "");
     // Cut at 60 characters, never inside a multi-byte one.
     std::string long_name;
     for (int i = 0; i < 70; ++i)

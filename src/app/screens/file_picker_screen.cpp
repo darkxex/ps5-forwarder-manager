@@ -69,8 +69,8 @@ Kind classify(const std::string &name)
     for (const char *s : {".zip", ".7z", ".rar", ".gz"})
         if (ends_with(name, s))
             return Kind::archive;
-    for (const char *s :
-         {".nsp", ".xci", ".iso", ".pkg", ".nro", ".nca", ".rom", ".bin", ".chd", ".cso", ".elf"})
+    for (const char *s : {".nsp", ".xci", ".iso", ".pkg", ".nro", ".nca", ".rom", ".bin", ".chd",
+                          ".cso", ".elf", ".xex"})
         if (ends_with(name, s))
             return Kind::rom;
     for (const char *s : {".txt", ".json", ".ini", ".log", ".cfg", ".md"})
@@ -217,9 +217,9 @@ class FilePickerScreen final : public Screen
 {
   public:
     FilePickerScreen(Context &context, std::string start_dir, std::vector<std::string> extensions,
-                     std::function<void(const std::string &)> on_pick)
+                     std::function<void(const std::string &)> on_pick, bool folders)
         : dir_(std::move(start_dir)), extensions_(std::move(extensions)),
-          on_pick_(std::move(on_pick))
+          on_pick_(std::move(on_pick)), folders_(folders)
     {
         if (dir_.empty())
             dir_ = "/data";
@@ -232,11 +232,9 @@ class FilePickerScreen final : public Screen
         {
             (void)item;
             (void)focus;
-            Kind kind = Kind::folder;
-            const int base = has_parent_row() ? 1 : 0;
-            if (index == 0 && has_parent_row())
-                kind = Kind::folder;
-            else if (index - base >= 0 && index - base < static_cast<int>(entries_.size()))
+            Kind kind = Kind::folder; // also ".." and "Use this folder"
+            const int base = leading_rows();
+            if (index - base >= 0 && index - base < static_cast<int>(entries_.size()))
                 kind = entries_[static_cast<std::size_t>(index - base)].kind;
             draw_file_icon(canvas.list, kind, row.x + 32.0f, row.y + row.h * 0.5f, 34.0f,
                            context.theme);
@@ -335,6 +333,15 @@ class FilePickerScreen final : public Screen
             up.chevron = true;
             items.push_back(std::move(up));
         }
+        // After "..", where the focus starts, so entering a folder and pressing
+        // again does not pick it by accident.
+        if (has_use_row())
+        {
+            hui::ui::ListItem use;
+            use.title = "Use this folder";
+            use.subtitle = dir_.substr(dir_.find_last_of('/') + 1);
+            items.push_back(std::move(use));
+        }
         for (const Entry &entry : entries_)
         {
             hui::ui::ListItem item;
@@ -350,6 +357,17 @@ class FilePickerScreen final : public Screen
     bool has_parent_row() const
     {
         return dir_ != "/";
+    }
+
+    // A game kept as a folder is picked from inside it, so the root is never one.
+    bool has_use_row() const
+    {
+        return folders_ && dir_ != "/";
+    }
+
+    int leading_rows() const
+    {
+        return (has_use_row() ? 1 : 0) + (has_parent_row() ? 1 : 0);
     }
 
     void update(Context &context, const hui::InputFrame &input, float dt,
@@ -369,6 +387,19 @@ class FilePickerScreen final : public Screen
                 if (index == 0)
                 {
                     go_up();
+                    return;
+                }
+                --index;
+            }
+            if (has_use_row())
+            {
+                if (index == 0)
+                {
+                    // The trailing slash tells the caller it is a folder.
+                    if (on_pick_)
+                        on_pick_(dir_ + "/");
+                    feedback.play(hui::audio::Cue::select);
+                    context.pop();
                     return;
                 }
                 --index;
@@ -409,7 +440,9 @@ class FilePickerScreen final : public Screen
         const hui::gfx::Color text = theme.page_text.a > 0.0f ? theme.page_text : theme.text;
         const hui::gfx::Color muted =
             theme.page_text_muted.a > 0.0f ? theme.page_text_muted : theme.text_muted;
-        hui::ui::text(scene.list, context.fonts.display, "Pick a file", 96.0f, 150.0f, 46.0f, text);
+        hui::ui::text(scene.list, context.fonts.display,
+                      folders_ ? "Pick a file or folder" : "Pick a file", 96.0f, 150.0f, 46.0f,
+                      text);
         crumbs_.set_bounds({96.0f, 250.0f, 1728.0f, 52.0f});
         crumbs_.draw(scene);
         if (entries_.empty())
@@ -432,6 +465,7 @@ class FilePickerScreen final : public Screen
     std::string dir_;
     std::vector<std::string> extensions_;
     std::function<void(const std::string &)> on_pick_;
+    bool folders_ = false; // offer "Use this folder"
     std::vector<Entry> entries_;
     mutable hui::ui::ListView list_;
     mutable hui::ui::Breadcrumb crumbs_;
@@ -441,10 +475,11 @@ class FilePickerScreen final : public Screen
 
 std::unique_ptr<Screen> make_file_picker_screen(Context &context, std::string start_dir,
                                                 std::vector<std::string> extensions,
-                                                std::function<void(const std::string &)> on_pick)
+                                                std::function<void(const std::string &)> on_pick,
+                                                bool folders)
 {
     return std::make_unique<FilePickerScreen>(context, std::move(start_dir), std::move(extensions),
-                                              std::move(on_pick));
+                                              std::move(on_pick), folders);
 }
 
 } // namespace fwd
