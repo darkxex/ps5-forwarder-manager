@@ -36,7 +36,9 @@ struct Target
     // flag is --exit-after-stream.
     bool stream = false;
     Feature feature = Feature::none; // offered only while this flag is on
-    bool rom_folder = false;         // the ROM may also be a folder (a game kept extracted)
+    // Takes the game as its only argument, a full path, instead of --rom
+    // (PS5X360, see fwd/x360_library.hpp).
+    bool game_path = false;
 };
 
 // The built-in emulator targets the site offers, plus "generic", without the
@@ -47,6 +49,9 @@ std::vector<Target> known_targets();
 // True when the target is a streaming client rather than an emulator.
 bool is_stream_target(const std::string &title_id);
 
+// True when the target takes the game's full path as its only argument.
+bool takes_game_path(const std::string &title_id);
+
 // A friendly name for a target title ID (emulator name, or the ID itself).
 std::string target_display_name(const std::string &title_id);
 
@@ -55,7 +60,7 @@ struct Forwarder
     std::string title_id;     // PPSA99xxx (the folder name)
     std::string display_name; // shown under the tile
     std::string target;       // title ID of the app to launch
-    std::string rom;          // ROM file (or folder) path/name passed as --rom (optional)
+    std::string rom;          // ROM file path/name passed as --rom, or the game path (optional)
     std::string pc;           // streaming target: the saved PC (optional: the last one used)
     std::string app;          // streaming target: the app to start on that PC
     bool exit_after_game = false;
@@ -68,7 +73,8 @@ struct Forwarder
 
     // Build the launch argument list the way the site does: --rom first (when
     // set), then the extra arguments, then --exit-after-game (when set). A
-    // streaming target gets --pc and --app first and --exit-after-stream last.
+    // streaming target gets --pc and --app first and --exit-after-stream last;
+    // a target that takes a game path gets the path alone first.
     std::vector<Argument> resolved_args() const;
 };
 

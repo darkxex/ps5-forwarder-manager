@@ -169,6 +169,7 @@ must be loaded on the console for a forwarder tile to launch its target.
 | [nothings/stb](https://github.com/nothings/stb) | `stb_image`, `stb_image_write`, `stb_image_resize2` (public domain / MIT), in `third_party/stb/` |
 | [SteamGridDB](https://www.steamgriddb.com/) | Game artwork, via its public API v2 with a user-supplied key |
 | [curl](https://curl.se/) / [OpenSSL](https://www.openssl.org/) | HTTPS client for SteamGridDB, linked from PacBrew |
+| [BrinooTk/PS5X360](https://github.com/BrinooTk/PS5X360) | `src/fwd/x360_library.cpp` follows its library scan, default game folders and STFS package header reading (`src/launcher.cpp`, `include/xbox360ps5/game_paths.hpp`), to list the games it finds; MIT, Copyright (c) 2026 Xbox360PS5 contributors |
 
 Artwork fetched from SteamGridDB is contributed by its community and belongs to
 its uploaders; it is used here only to build a personal home-screen tile.
