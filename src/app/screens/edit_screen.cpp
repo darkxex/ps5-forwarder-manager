@@ -18,6 +18,8 @@
 #include "audio/at9.hpp"
 #include "core/tween.hpp"
 #include "fwd/image.hpp"
+#include "fwd/library_game.hpp"
+#include "fwd/psx_library.hpp"
 #include "fwd/rom_name.hpp"
 #include "fwd/store.hpp"
 #include "fwd/stream_catalog.hpp"
@@ -244,7 +246,7 @@ class EditScreen final : public Screen
 
     // The game picked from the emulator's library: its path, its name, and its
     // cover as the tile icon unless the player chose an icon of their own.
-    void pick_game(const X360Game &game)
+    void pick_game(const LibraryGame &game)
     {
         forwarder_.rom = game.path;
         if (forwarder_.display_name.empty())
@@ -265,7 +267,7 @@ class EditScreen final : public Screen
         build(*context_);
     }
 
-    static std::vector<unsigned char> game_art(const X360Game &game)
+    static std::vector<unsigned char> game_art(const LibraryGame &game)
     {
         if (!game.cover.empty())
             return read_stream_file(game.cover);
@@ -273,21 +275,28 @@ class EditScreen final : public Screen
                                        : std::vector<unsigned char>();
     }
 
-    // PS5X360's games, where it looks for them (fwd/x360_library.hpp).
+    // The emulator's games, where it looks for them (fwd/x360_library.hpp,
+    // fwd/psx_library.hpp).
     void open_game_list(Context &context)
     {
-        x360_install_ = find_x360_install(context.settings.forwarders_root);
-        games_ = read_x360_library(x360_install_, x360_game_paths(x360_install_));
+        const bool x360 = current_target().library == GameLibrary::x360;
+        if (x360)
+        {
+            x360_install_ = find_x360_install(context.settings.forwarders_root);
+            games_ = read_x360_library(x360_install_, x360_game_paths(x360_install_));
+        }
+        else
+            games_ = read_psx_library(psx_game_paths(), std::string(kPsxDataRoot) + "/covers");
         PickList list;
         list.heading = "Pick a game";
         list.caption = std::to_string(games_.size()) + (games_.size() == 1 ? " game" : " games") +
                        " where " + target_display_name(forwarder_.target) + " looks for them";
-        if (x360_install_.empty())
+        if (x360 && x360_install_.empty())
             list.caption += " (not found in " + context.settings.forwarders_root + ")";
         list.fallback_title = "Choose a file or folder";
         list.fallback_caption = "For a game in a folder added in the emulator's settings";
         list.no_art = "no cover";
-        for (const X360Game &game : games_)
+        for (const LibraryGame &game : games_)
         {
             PickItem item;
             item.title = game.name;
@@ -307,10 +316,25 @@ class EditScreen final : public Screen
             }));
     }
 
-    // A game file, or a folder with its .xex, given as PS5X360 sees it.
+    // A game file, or for PS5X360 a folder with its .xex, given by full path
+    // (as PS5X360 sees it).
     void open_game_file(Context &context)
     {
         EditScreen *self = this;
+        if (current_target().library == GameLibrary::psx)
+        {
+            context.push(make_file_picker_screen(context, std::string(kPsxDataRoot) + "/games", {},
+                                                 [self](const std::string &path)
+                                                 {
+                                                     self->forwarder_.rom = path;
+                                                     if (self->forwarder_.display_name.empty())
+                                                         self->forwarder_.display_name =
+                                                             library_game_name(
+                                                                 self->forwarder_.target, path);
+                                                     self->dirty_ = true;
+                                                 }));
+            return;
+        }
         context.push(make_file_picker_screen(
             context, "/data", {},
             [self](const std::string &path)
@@ -360,9 +384,10 @@ class EditScreen final : public Screen
         form_.add_header(editing_ ? "Edit forwarder" : "New forwarder");
         // The ROM comes first: picking it also names an unnamed forwarder. A
         // streaming target has none; its PC and app follow under Launch.
-        if (current_target().game_path)
+        if (current_target().library != GameLibrary::none)
             form_.add_action(RowRom, "Game").text =
-                forwarder_.rom.empty() ? "(none)" : x360_game_name(forwarder_.rom);
+                forwarder_.rom.empty() ? "(none)"
+                                       : library_game_name(forwarder_.target, forwarder_.rom);
         else if (!current_target().stream)
             form_.add_action(RowRom, "ROM file").text =
                 forwarder_.rom.empty() ? "(none)" : forwarder_.rom;
@@ -592,7 +617,7 @@ class EditScreen final : public Screen
             break;
         case RowRom:
         {
-            if (current_target().game_path)
+            if (current_target().library != GameLibrary::none)
             {
                 open_game_list(context);
                 break;
@@ -1003,11 +1028,11 @@ class EditScreen final : public Screen
 
         // "<system>  ·  <title id>  ·  <ROM>", as the concept's genre · year · studio.
         const bool stream = is_stream_target(forwarder_.target);
-        const bool game = takes_game_path(forwarder_.target);
+        const bool game = library_of(forwarder_.target) != GameLibrary::none;
         const std::string rom =
             stream ? (forwarder_.app.empty() ? std::string("no app") : forwarder_.app)
             : forwarder_.rom.empty() ? std::string(game ? "no game" : "no ROM")
-            : game                   ? x360_game_name(forwarder_.rom)
+            : game                   ? library_game_name(forwarder_.target, forwarder_.rom)
                                      : forwarder_.rom;
         (void)std::snprintf(text, sizeof(text), "%s  \xC2\xB7  %s  \xC2\xB7  %s",
                             target_display_name(forwarder_.target).c_str(),
@@ -1184,7 +1209,7 @@ class EditScreen final : public Screen
     bool type_app_ = false; // open the app name prompt on the next frame
     // The emulator's games, while its list is open (fwd/x360_library.hpp).
     std::string x360_install_;
-    std::vector<X360Game> games_;
+    std::vector<LibraryGame> games_;
     bool choose_game_file_ = false; // open the file picker on the next frame
     bool background_dirty_ = false; // a new background was picked
     bool music_dirty_ = false;      // new music was picked or converted
