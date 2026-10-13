@@ -54,7 +54,7 @@ int main()
     fwd::Settings settings;
     settings.forwarders_root = "/data/forwarders";
     settings.sounds = false;
-    if (!settings.save(path))
+    if (!settings.save(path).empty())
     {
         std::fprintf(stderr, "save failed: %s\n", path.c_str());
         ++failures;

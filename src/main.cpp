@@ -136,12 +136,23 @@ int main()
     // The process root may have changed: find the app's files again.
     paths::refresh();
     sys::log("[FWD] app root after elevation: %s", paths::app_root().c_str());
-    // Settings live in the title's own download0. Resolve it only now: after
-    // elevation bare /download0 no longer reaches it, and saves made there
-    // fail, so a changed forwarders folder was lost on the next launch.
-    const std::string data_root = paths::download_root() + "/ps5fwdgen";
+    // Settings. After elevation bare /download0 no longer reaches the title's
+    // own download0, and the elevated process may not own a folder an earlier
+    // run made there, so saves were lost and a changed forwarders folder came
+    // back as /data/homebrew. Elevated, the app keeps them in its /data folder
+    // (shared with its launcher), bringing over a copy left in download0 once.
+    const std::string legacy_root = paths::download_root() + "/ps5fwdgen";
+    const std::string data_root =
+        elevated == elevation::Status::ok ? std::string("/data/forwarder-manager") : legacy_root;
     sys::log("[FWD] storage dir=%d %s", save::ensure_directory(data_root) ? 1 : 0,
              data_root.c_str());
+    {
+        std::string current, old_settings;
+        if (data_root != legacy_root && !save::read_file(data_root + "/settings.txt", &current) &&
+            save::read_file(legacy_root + "/settings.txt", &old_settings))
+            sys::log("[FWD] settings moved from download0: %d",
+                     save::write_atomic(data_root + "/settings.txt", old_settings).empty() ? 1 : 0);
+    }
     // Forwarder tiles need a launcher payload; start the built-in one if
     // nothing serves them yet (see platform/launcher_inject.hpp).
     launcher::ensure_running(paths::assets() + "/launcher/fwd-launcher.elf");
