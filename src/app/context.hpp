@@ -28,7 +28,7 @@ struct Context
     hui::gfx::Renderer &renderer;
     hui::ui::Theme theme;
     Settings settings;
-    std::string data_root;         // /download0/ps5fwdgen
+    std::string data_root;         // <title download0>/ps5fwdgen
     std::string app_template_root; // <app>/assets/forwarder-template
     bool elevated = false;         // /data is reachable (Lapy said yes)
     std::string elevation_status;

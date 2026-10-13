@@ -45,7 +45,8 @@ hui::ui::Theme fixed_theme()
 
 void Context::save_settings()
 {
-    settings.save(data_root + "/settings.txt");
+    if (!settings.save(data_root + "/settings.txt"))
+        hui::sys::log("[FWD] settings save failed: %s/settings.txt", data_root.c_str());
 }
 
 struct App::Stack

@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <string_view>
 
 namespace paths
 {
@@ -102,6 +103,20 @@ const std::string &title_id()
     if (g_title.empty())
         (void)app_root();
     return g_title;
+}
+
+std::string download_root()
+{
+    return download_root_for(app_root());
+}
+
+std::string download_root_for(const std::string &app_root)
+{
+    constexpr std::string_view suffix = "/app0";
+    if (app_root.size() < suffix.size() ||
+        app_root.compare(app_root.size() - suffix.size(), suffix.size(), suffix) != 0)
+        return "/download0";
+    return app_root.substr(0, app_root.size() - suffix.size()) + "/download0";
 }
 
 } // namespace paths

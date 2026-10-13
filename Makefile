@@ -128,7 +128,7 @@ opengl:
 	@printf '%s\n' '==> [opengl] Preparing the ps5-opengl SDK link group'
 	@bash tools/prepare-opengl.sh
 
-.PHONY: all app build init doctor test test-deps test-unit test-integration libc deps pacbrew pacbrew-list assets-check format format-check tidy lint check ffpkg ffpfsc packages sandbox-elevation-example sandbox-elevation-ffpfsc update-check-example test-update-check test-rom-name test-features test-x360-library self-update-helper self-update-example test-self-update deploy undeploy clean distclean help
+.PHONY: all app build init doctor test test-deps test-unit test-integration libc deps pacbrew pacbrew-list assets-check format format-check tidy lint check ffpkg ffpfsc packages sandbox-elevation-example sandbox-elevation-ffpfsc update-check-example test-update-check test-rom-name test-settings test-features test-x360-library self-update-helper self-update-example test-self-update deploy undeploy clean distclean help
 
 all: app
 build: app
@@ -141,7 +141,7 @@ doctor:
 	@printf '%s\n' '==> [doctor] Checking the Linux/WSL host without changing it'
 	@bash tools/doctor.sh
 
-test: test-unit test-integration test-elevation test-update-check test-self-update test-rom-name test-features test-x360-library
+test: test-unit test-integration test-elevation test-update-check test-self-update test-rom-name test-settings test-features test-x360-library
 
 .PHONY: app-assets
 # Rebuild the app's own sce_sys presentation assets (icon0.png, pic0.dds,
@@ -200,6 +200,13 @@ test-rom-name:
 	@$(HOST_CXX) $(HOST_TEST_CXXFLAGS) -Isrc -g -fsanitize=address,undefined -fno-sanitize-recover=all \
 		tests/test_rom_name.cpp $(HOST_TEST_LDFLAGS) -o build/tests/test_rom_name
 	@build/tests/test_rom_name
+
+test-settings:
+	@mkdir -p build/tests
+	@$(HOST_CXX) $(HOST_TEST_CXXFLAGS) -Isrc -g -fsanitize=address,undefined -fno-sanitize-recover=all \
+		tests/test_settings.cpp src/app/settings.cpp src/core/save_file.cpp \
+		src/platform/app_paths.cpp $(HOST_TEST_LDFLAGS) -o build/tests/test_settings
+	@build/tests/test_settings
 
 test-self-update:
 	@mkdir -p build/tests/self-update
