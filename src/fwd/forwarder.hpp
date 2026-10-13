@@ -8,6 +8,8 @@
 // arguments, which the store maps to the format's plain argument list.
 #pragma once
 
+#include "fwd/features.hpp"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -33,9 +35,12 @@ struct Target
     // passed as --pc <name or address> and --app <name or number>; its exit
     // flag is --exit-after-stream.
     bool stream = false;
+    Feature feature = Feature::none; // offered only while this flag is on
 };
 
-// The built-in emulator targets the site offers, plus "generic".
+// The built-in emulator targets the site offers, plus "generic", without the
+// ones whose feature flag is off (fwd/features.hpp). A forwarder on disk whose
+// target is not listed shows its title ID and edits as a generic target.
 std::vector<Target> known_targets();
 
 // True when the target is a streaming client rather than an emulator.

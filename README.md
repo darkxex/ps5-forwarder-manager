@@ -103,6 +103,21 @@ key built into the app: set `STEAMGRIDDB_API_KEY` in `.env` (see
 repository's `STEAMGRIDDB_API_KEY` Actions secret. Without a key the app
 still works, with image files only.
 
+Feature flags switch parts of the app off at build time. They are listed,
+with their defaults, in `src/fwd/features.hpp`, and the app logs each one at
+start (`[FWD] feature NAME=0|1`). Turn one on for a build with `FEATURES`:
+
+| Flag | Default | What it controls |
+| --- | --- | --- |
+| `PAYLOAD_TARGET` | off | The "Payload" (PPSA00000) target app |
+
+```sh
+make FEATURES="PAYLOAD_TARGET=1"
+```
+
+A forwarder whose target is switched off still loads: it shows its target's
+title ID and edits as a generic target.
+
 ## Releases
 
 Versions follow the PlayStation `contentVersion` format, `NN.NNN.NNN`

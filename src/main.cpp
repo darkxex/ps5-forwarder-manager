@@ -17,6 +17,7 @@
 #include "core/input.hpp"
 #include "core/save_file.hpp"
 #include "core/version.hpp"
+#include "fwd/features.hpp"
 #include "fwd/image.hpp"
 #include "gfx/canvas.hpp"
 #include "gfx/renderer.hpp"
@@ -196,6 +197,11 @@ int main()
         version += " (" + build_label + ")";
     app.set_version(version);
     sys::log("[FWD] version %s", version.empty() ? "unknown" : version.c_str());
+    for (int i = 1; i < static_cast<int>(fwd::Feature::count); ++i)
+    {
+        const auto feature = static_cast<fwd::Feature>(i);
+        sys::log("[FWD] feature %s=%d", fwd::feature_name(feature), fwd::enabled(feature) ? 1 : 0);
+    }
 
     std::int64_t previous = sys::monotonic_us();
     std::uint64_t frames = 0;

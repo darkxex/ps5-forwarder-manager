@@ -34,15 +34,20 @@ bool is_stream_target(const std::string &title_id)
 std::vector<Target> known_targets()
 {
     // The target apps PS5 Forwarder Builder supports (from ps5-forwarder.mph.am):
-    return {
-        {"PPSA99008", "ProsperoEden", true, true},         // Nintendo Switch (Eden)
-        {"PPSA99764", "Porpoise", true, false},            // GameCube / Wii (RetroArch)
-        {"PPSA99203", "PS5SX2", true, false},              // PlayStation 2 (PCSX2)
-        {"PPSA50011", "PS5X360", true, false},             // Xbox 360 (Xenia)
-        {"PPSA00000", "Payload", true, false},             // ELF payload launcher
+    static const Target kAll[] = {
+        {"PPSA99008", "ProsperoEden", true, true}, // Nintendo Switch (Eden)
+        {"PPSA99764", "Porpoise", true, false},    // GameCube / Wii (RetroArch)
+        {"PPSA99203", "PS5SX2", true, false},      // PlayStation 2 (PCSX2)
+        {"PPSA50011", "PS5X360", true, false},     // Xbox 360 (Xenia)
+        {"PPSA00000", "Payload", true, false, false, Feature::payload_target}, // ELF payloads
         {"PPSA99002", "ProsperoLight", false, true, true}, // Moonlight/Sunshine streaming
         {"", "Generic (enter a title ID)", false, false},
     };
+    std::vector<Target> targets;
+    for (const Target &target : kAll)
+        if (enabled(target.feature))
+            targets.push_back(target);
+    return targets;
 }
 
 std::vector<Argument> Forwarder::resolved_args() const
