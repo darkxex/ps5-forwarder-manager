@@ -18,6 +18,7 @@
 #include "audio/at9.hpp"
 #include "core/tween.hpp"
 #include "fwd/image.hpp"
+#include "fwd/rom_name.hpp"
 #include "fwd/store.hpp"
 #include "fwd/stream_catalog.hpp"
 #include "gfx/gl_batch.hpp"
@@ -264,6 +265,11 @@ class EditScreen final : public Screen
             target_names.push_back(target.name);
 
         form_.add_header(editing_ ? "Edit forwarder" : "New forwarder");
+        // The ROM comes first: picking it also names an unnamed forwarder. A
+        // streaming target has none; its PC and app follow under Launch.
+        if (!current_target().stream)
+            form_.add_action(RowRom, "ROM file").text =
+                forwarder_.rom.empty() ? "(none)" : forwarder_.rom;
         form_.add_action(RowName, "Display name").text =
             forwarder_.display_name.empty() ? "(required)" : forwarder_.display_name;
         form_.add_choice(RowTarget, "Target app", target_names, target_index_);
@@ -272,8 +278,10 @@ class EditScreen final : public Screen
                 forwarder_.target.empty() ? "(enter one)" : forwarder_.target;
         form_.add_action(RowTitleId, "Forwarder title ID").text = forwarder_.title_id;
 
-        form_.add_header("Launch");
-        if (current_target().stream)
+        const bool stream = current_target().stream;
+        if (stream || current_target().exit_after_game)
+            form_.add_header("Launch");
+        if (stream)
         {
             // A streaming client starts an app on a PC, not a ROM.
             // With what the client published, both are picked; without it, typed.
@@ -286,15 +294,8 @@ class EditScreen final : public Screen
             app.text = forwarder_.app.empty() ? "(required)" : forwarder_.app;
             app.chevron = selected_pc() != nullptr && !selected_pc()->apps.empty();
         }
-        else
-        {
-            form_.add_action(RowRom, "ROM file").text =
-                forwarder_.rom.empty() ? "(none)" : forwarder_.rom;
-        }
         if (current_target().exit_after_game)
-            form_.add_toggle(RowExit,
-                             current_target().stream ? "Exit after the stream"
-                                                     : "Exit after quitting game",
+            form_.add_toggle(RowExit, stream ? "Exit after the stream" : "Exit after quitting game",
                              forwarder_.exit_after_game);
 
         form_.add_header("Presentation");
@@ -497,6 +498,8 @@ class EditScreen final : public Screen
                     const std::size_t slash = path.find_last_of('/');
                     self->forwarder_.rom =
                         slash == std::string::npos ? path : path.substr(slash + 1);
+                    if (self->forwarder_.display_name.empty())
+                        self->forwarder_.display_name = name_from_rom(self->forwarder_.rom);
                     self->dirty_ = true;
                 }));
             break;
