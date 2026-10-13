@@ -14,9 +14,10 @@
 //     an STFS package of a game (arcade, Games on Demand, installed disc...)
 //     is a package; a *.data folder (a package's data) is skipped.
 //
-// PS5X360 starts the game whose full path is its first argument, and only
-// when that path is a file (src/native_game_main.cpp): the .xex for an
-// extracted game, the image, or the package. Its own install is /app0 to it.
+// PS5X360 starts the game whose full path is its first argument (argv[1]; the
+// system leaves argv[0] empty), and only when that path is a file
+// (src/canary_game_main.cpp): the .xex for an extracted game, the image, or
+// the package. Its own install is /app0 to it.
 // Folders added in its settings are not visible here; the edit screen offers
 // a file or folder pick for those.
 #pragma once
