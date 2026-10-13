@@ -24,4 +24,13 @@ std::string assets();
 // The title ID read from the app's own param.json (empty when unreadable).
 const std::string &title_id();
 
+// The title's own writable storage (its download0). Bare /download0 only
+// resolves inside the sandbox; after elevation it is the sibling of the
+// resolved app root (/mnt/sandbox/<TITLE>_000/download0).
+std::string download_root();
+
+// download_root() for a given app root: ".../app0" -> ".../download0", and
+// "/download0" for any other root.
+std::string download_root_for(const std::string &app_root);
+
 } // namespace paths

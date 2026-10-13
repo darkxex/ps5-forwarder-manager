@@ -45,10 +45,6 @@ extern "C" void hui_heap_stats(std::size_t *live_bytes, std::size_t *peak_bytes,
 namespace
 {
 
-// Settings live in the title's own save area, which exists in both the
-// sandboxed and the elevated state.
-constexpr const char *kDataRoot = "/download0/ps5fwdgen";
-
 void log_heap(std::uint64_t frames)
 {
     std::size_t live = 0;
@@ -115,7 +111,6 @@ int main()
 {
     using namespace hui;
     sys::log("[FWD] entry title=%s root=%s", paths::title_id().c_str(), paths::app_root().c_str());
-    sys::log("[FWD] storage dir=%d", save::ensure_directory(kDataRoot) ? 1 : 0);
 
     // A pull-request build carries a label ("PR 12, 1a2b3c4") so it can be
     // told apart on the console. Read it through /app0 now, before elevation
@@ -141,6 +136,23 @@ int main()
     // The process root may have changed: find the app's files again.
     paths::refresh();
     sys::log("[FWD] app root after elevation: %s", paths::app_root().c_str());
+    // Settings. After elevation bare /download0 no longer reaches the title's
+    // own download0, and the elevated process may not own a folder an earlier
+    // run made there, so saves were lost and a changed forwarders folder came
+    // back as /data/homebrew. Elevated, the app keeps them in its /data folder
+    // (shared with its launcher), bringing over a copy left in download0 once.
+    const std::string legacy_root = paths::download_root() + "/ps5fwdgen";
+    const std::string data_root =
+        elevated == elevation::Status::ok ? std::string("/data/forwarder-manager") : legacy_root;
+    sys::log("[FWD] storage dir=%d %s", save::ensure_directory(data_root) ? 1 : 0,
+             data_root.c_str());
+    {
+        std::string current, old_settings;
+        if (data_root != legacy_root && !save::read_file(data_root + "/settings.txt", &current) &&
+            save::read_file(legacy_root + "/settings.txt", &old_settings))
+            sys::log("[FWD] settings moved from download0: %d",
+                     save::write_atomic(data_root + "/settings.txt", old_settings).empty() ? 1 : 0);
+    }
     // Forwarder tiles need a launcher payload; start the built-in one if
     // nothing serves them yet (see platform/launcher_inject.hpp).
     launcher::ensure_running(paths::assets() + "/launcher/fwd-launcher.elf");
@@ -148,8 +160,7 @@ int main()
 
     // Dev-only: exercise the real write path on hardware when triggered.
     {
-        const fwd::Settings dev_settings =
-            fwd::Settings::load(std::string(kDataRoot) + "/settings.txt");
+        const fwd::Settings dev_settings = fwd::Settings::load(data_root + "/settings.txt");
         fwd::run_dev_selftest(dev_settings.forwarders_root, assets + "/forwarder-template");
     }
 
@@ -190,7 +201,7 @@ int main()
     const auto bank = sounds.load(assets + "/audio/sfx");
     sys::log("[FWD] sounds files=%d rejected=%d", bank.files, bank.rejected);
 
-    fwd::App app(fonts, renderer, kDataRoot, mixer, elevated == elevation::Status::ok,
+    fwd::App app(fonts, renderer, data_root, mixer, elevated == elevation::Status::ok,
                  status_name(elevated));
     std::string version = read_content_version(paths::app_root() + "/sce_sys/param.json");
     if (!build_label.empty())
@@ -302,13 +313,7 @@ int main()
             // elevation the process root is the console's, so bare /download0
             // no longer resolves; derive it from the resolved app root
             // (".../app0" -> ".../download0").
-            std::string shot_dir = "/download0";
-            {
-                const std::string &root = paths::app_root();
-                const std::size_t slash = root.find_last_of('/');
-                if (slash != std::string::npos && slash > 0)
-                    shot_dir = root.substr(0, slash) + "/download0";
-            }
+            const std::string shot_dir = paths::download_root();
             char shot_path[160];
             (void)std::snprintf(shot_path, sizeof(shot_path), "%s/shot-%d.png", shot_dir.c_str(),
                                 shot_index++);

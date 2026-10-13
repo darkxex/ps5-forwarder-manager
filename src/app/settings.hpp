@@ -26,7 +26,8 @@ struct Settings
     bool convert_audio_online = true;
 
     static Settings load(const std::string &path);
-    bool save(const std::string &path) const;
+    // Empty on success, else why the file could not be written.
+    std::string save(const std::string &path) const;
 };
 
 } // namespace fwd

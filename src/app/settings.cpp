@@ -85,17 +85,20 @@ Settings Settings::load(const std::string &path)
     return settings;
 }
 
-bool Settings::save(const std::string &path) const
+std::string Settings::save(const std::string &path) const
 {
     std::string text = "# ps5fwdgen settings\n";
     text += "forwarders_root=" + forwarders_root + "\n";
-    text += "steamgriddb_key=" + steamgriddb_key + "\n";
+    // The built-in key is not written out: the file sits in /data, which
+    // every app can read, and loading falls back to the built-in key anyway.
+    if (steamgriddb_key != kBuiltinSteamGridDbKey)
+        text += "steamgriddb_key=" + steamgriddb_key + "\n";
     text += "theme=" + std::to_string(theme) + "\n";
     text += std::string("swap_confirm=") + (swap_confirm ? "1" : "0") + "\n";
     text += std::string("sounds=") + (sounds ? "1" : "0") + "\n";
     text += std::string("reduced_motion=") + (reduced_motion ? "1" : "0") + "\n";
     text += std::string("convert_audio_online=") + (convert_audio_online ? "1" : "0") + "\n";
-    return hui::save::write_atomic(path, text).empty();
+    return hui::save::write_atomic(path, text);
 }
 
 } // namespace fwd
