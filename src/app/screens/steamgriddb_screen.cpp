@@ -25,6 +25,7 @@
 // an atomic phase and a mutex-guarded payload each frame, and uploads GL
 // textures on the main thread (the only place the GL context is current).
 
+#include "app/keyboard_prompt.hpp"
 #include "app/screens/steamgriddb_screen.hpp"
 
 #include "app/context.hpp"
@@ -183,11 +184,7 @@ class SteamGridScreen final : public Screen
           on_image_(std::move(on_image))
     {
         restyle(context);
-        {
-            auto kb = hui::ui::KeyboardBindings::standard();
-            kb.done = hui::Action::page_next; // R1 confirms (a console keyboard nicety)
-            prompt_.keyboard.style.bindings = kb;
-        }
+        bind_keyboard_prompt(prompt_); // R2 confirms
         prompt_.style.buttons = false; // single Done: the keyboard's own key (closes on press)
         prompt_.set_title("Search SteamGridDB");
         prompt_.style.max_length = 80;
@@ -215,7 +212,7 @@ class SteamGridScreen final : public Screen
         bar_.style.height = 8.0f;
         bar_.style.sheen = true;
         bar_.style.finish_flash = false;
-        prompt_.style.theme = context.theme;
+        style_keyboard_prompt(prompt_, context.theme);
     }
 
     void enter(Context &context) override
