@@ -33,4 +33,17 @@ struct Decoded
 // ATRAC9 sub-format (what the website's converter and the console write).
 Decoded decode(const unsigned char *data, std::size_t size);
 
+// The forwarder format allows "at most about 87 seconds" of selection music
+// (external/ps5-forwarder-format/SPEC.md); kept a little under that.
+constexpr double kMaxMusicSeconds = 85.0;
+
+// Cuts an ATRAC9 WAVE to at most max_seconds, at a superframe boundary, and
+// rewrites the fact sample count, the smpl loop end and the chunk sizes to
+// match, so the console loops the shorter clip. Returns the file unchanged
+// when it is already short enough or is not an ATRAC9 WAVE.
+std::vector<unsigned char> trim(const std::vector<unsigned char> &file, double max_seconds);
+
+// The clip's length in seconds from its fact chunk (0 when unknown).
+double duration(const unsigned char *data, std::size_t size);
+
 } // namespace fwd::at9

@@ -170,7 +170,12 @@ must be loaded on the console for a forwarder tile to launch its target.
 | [SteamGridDB](https://www.steamgriddb.com/) | Game artwork, via its public API v2 with a user-supplied key |
 | [curl](https://curl.se/) / [OpenSSL](https://www.openssl.org/) | HTTPS client for SteamGridDB, linked from PacBrew |
 | [darkxex/SwanStationPS5](https://github.com/darkxex/SwanStationPS5) | `src/fwd/psx_library.cpp` follows its game library rules (`src/main.c`, `src/library.c`, `src/covers.c`): the folders it scans, the image it starts a game from, its titles and covers; GPL-3.0-or-later |
+| [FAAD2](https://github.com/knik0/faad2) | AAC decoder for the theme-music preview (`src/audio/mp4_aac.cpp`), linked from PacBrew; GPL-2.0-or-later |
+| [OMGDuke/SDH-GameThemeMusic](https://github.com/OMGDuke/SDH-GameThemeMusic) | The theme-music search follows its approach (search "<game> Theme Music", pick the best audio-only stream); no code is copied |
+| [YouTube](https://www.youtube.com/) | Theme-music search and audio, via its InnerTube API (`src/net/youtube.cpp`); the client settings follow [yt-dlp](https://github.com/yt-dlp/yt-dlp)'s `visionos` client |
 | [BrinooTk/PS5X360](https://github.com/BrinooTk/PS5X360) | `src/fwd/x360_library.cpp` follows its library scan, default game folders and STFS package header reading (`src/launcher.cpp`, `include/xbox360ps5/game_paths.hpp`), to list the games it finds; MIT, Copyright (c) 2026 Xbox360PS5 contributors |
 
 Artwork fetched from SteamGridDB is contributed by its community and belongs to
-its uploaders; it is used here only to build a personal home-screen tile.
+its uploaders; it is used here only to build a personal home-screen tile. Music
+fetched from YouTube belongs to its rights holders; the app keeps only a short
+clip, as a personal tile's selection music.

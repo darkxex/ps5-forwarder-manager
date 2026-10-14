@@ -164,6 +164,10 @@ static int console_curl_lookup(const char *name, struct in_addr *address)
         /* 5 s per try, 2 retries. */
         result =
             sceNetResolverStartNtoa(resolver, name, address, 5000000, 2, 0) < 0 ? EAI_NONAME : 0;
+        /* 0.0.0.0 is a DNS blocklist's answer, never a host: report the name
+           as unresolvable rather than let the connect fail obscurely. */
+        if (result == 0 && address->s_addr == 0)
+            result = EAI_NONAME;
         (void)sceNetResolverDestroy(resolver);
     }
     (void)sceNetPoolDestroy(pool);
