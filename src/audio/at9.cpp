@@ -6,6 +6,7 @@
 
 #include "third_party/libatrac9/libatrac9.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace fwd::at9
@@ -30,12 +31,22 @@ std::uint16_t u16(const unsigned char *p)
 constexpr unsigned char kAt9Guid[16] = {0xd2, 0x42, 0xe1, 0x47, 0xba, 0x36, 0x8d, 0x4d,
                                         0x88, 0xfc, 0x61, 0x65, 0x4f, 0x8c, 0x83, 0x6c};
 
+void put32(unsigned char *p, std::uint32_t v)
+{
+    p[0] = static_cast<unsigned char>(v);
+    p[1] = static_cast<unsigned char>(v >> 8);
+    p[2] = static_cast<unsigned char>(v >> 16);
+    p[3] = static_cast<unsigned char>(v >> 24);
+}
+
 struct Riff
 {
     const unsigned char *fmt = nullptr;
     std::size_t fmt_size = 0;
     const unsigned char *fact = nullptr;
     std::size_t fact_size = 0;
+    const unsigned char *smpl = nullptr;
+    std::size_t smpl_size = 0;
     const unsigned char *data = nullptr;
     std::size_t data_size = 0;
 };
@@ -61,6 +72,11 @@ bool parse_riff(const unsigned char *d, std::size_t n, Riff &out)
             out.fact = body;
             out.fact_size = size;
         }
+        else if (std::memcmp(d + p, "smpl", 4) == 0)
+        {
+            out.smpl = body;
+            out.smpl_size = size;
+        }
         else if (std::memcmp(d + p, "data", 4) == 0)
         {
             out.data = body;
@@ -72,7 +88,66 @@ bool parse_riff(const unsigned char *d, std::size_t n, Riff &out)
     return out.fmt != nullptr && out.data != nullptr;
 }
 
+bool is_at9(const Riff &riff)
+{
+    return riff.fmt_size >= 52 && u16(riff.fmt) == 0xfffe &&
+           std::memcmp(riff.fmt + 24, kAt9Guid, 16) == 0;
+}
+
 } // namespace
+
+double duration(const unsigned char *data, std::size_t size)
+{
+    Riff riff;
+    if (!parse_riff(data, size, riff) || !is_at9(riff) || riff.fact == nullptr ||
+        riff.fact_size < 4)
+        return 0.0;
+    const std::uint32_t rate = u32(riff.fmt + 4);
+    return rate > 0 ? static_cast<double>(u32(riff.fact)) / rate : 0.0;
+}
+
+std::vector<unsigned char> trim(const std::vector<unsigned char> &file, double max_seconds)
+{
+    Riff riff;
+    if (!parse_riff(file.data(), file.size(), riff) || !is_at9(riff) || riff.fact == nullptr ||
+        riff.fact_size < 12 || max_seconds <= 0.0)
+        return file;
+    const std::uint32_t rate = u32(riff.fmt + 4);
+    const std::size_t block = u16(riff.fmt + 12);     // bytes per superframe
+    const std::size_t per_block = u16(riff.fmt + 18); // samples per superframe
+    const std::uint32_t total = u32(riff.fact);
+    const std::uint32_t delay = u32(riff.fact + 8);
+    const auto keep = static_cast<std::uint32_t>(max_seconds * rate);
+    if (rate == 0 || block == 0 || per_block == 0 || total <= keep)
+        return file;
+
+    // Whole superframes covering the encoder delay plus the kept samples.
+    const std::size_t blocks = (static_cast<std::size_t>(keep) + delay + per_block - 1) / per_block;
+    const std::size_t data_size = std::min(blocks * block, riff.data_size - riff.data_size % block);
+    const std::size_t data_at = static_cast<std::size_t>(riff.data - file.data());
+
+    // Everything before the data stays (fmt, fact, smpl...); the data is cut.
+    std::vector<unsigned char> out(file.begin(),
+                                   file.begin() + static_cast<std::ptrdiff_t>(data_at + data_size));
+    put32(out.data() + 4, static_cast<std::uint32_t>(out.size() - 8));
+    put32(out.data() + data_at - 4, static_cast<std::uint32_t>(data_size));
+    const std::size_t fact_at = static_cast<std::size_t>(riff.fact - file.data());
+    put32(out.data() + fact_at, keep);
+    // smpl: 36 bytes of header, then loops of 24 bytes (id, type, start, end, ...).
+    if (riff.smpl != nullptr && riff.smpl_size >= 36 + 24)
+    {
+        const std::size_t smpl_at = static_cast<std::size_t>(riff.smpl - file.data());
+        const std::uint32_t loops = u32(riff.smpl + 28);
+        for (std::uint32_t i = 0; i < loops && 36 + (i + 1) * 24 <= riff.smpl_size; ++i)
+        {
+            unsigned char *loop = out.data() + smpl_at + 36 + i * 24;
+            const std::uint32_t start = u32(loop + 8);
+            const std::uint32_t end = keep + delay - 1;
+            put32(loop + 12, end > start ? end : start);
+        }
+    }
+    return out;
+}
 
 Decoded decode(const unsigned char *data, std::size_t size)
 {
@@ -85,8 +160,7 @@ Decoded decode(const unsigned char *data, std::size_t size)
     }
     // WAVE_FORMAT_EXTENSIBLE (0xFFFE) with the ATRAC9 sub-format; the 4-byte
     // codec config follows the GUID and a version word.
-    if (riff.fmt_size < 52 || u16(riff.fmt) != 0xfffe ||
-        std::memcmp(riff.fmt + 24, kAt9Guid, 16) != 0)
+    if (!is_at9(riff))
     {
         result.error = "not an ATRAC9 WAVE";
         return result;
@@ -131,10 +205,16 @@ Decoded decode(const unsigned char *data, std::size_t size)
     std::vector<std::int16_t> pcm;
     pcm.reserve(superframes * static_cast<std::size_t>(info.framesInSuperframe) * frame_pcm);
     std::vector<std::int16_t> frame(frame_pcm);
+    // LibAtrac9's bit reader peeks a few bytes past what it consumes, so each
+    // superframe is decoded from a copy with zeroed room after it: the last
+    // one sits at the very end of the file buffer.
+    std::vector<unsigned char> padded(static_cast<std::size_t>(info.superframeSize) + 16, 0);
     bool broken = false;
     for (std::size_t s = 0; s < superframes && !broken; ++s)
     {
-        const unsigned char *p = riff.data + s * static_cast<std::size_t>(info.superframeSize);
+        std::memcpy(padded.data(), riff.data + s * static_cast<std::size_t>(info.superframeSize),
+                    static_cast<std::size_t>(info.superframeSize));
+        const unsigned char *p = padded.data();
         const unsigned char *end = p + info.superframeSize;
         for (int f = 0; f < info.framesInSuperframe; ++f)
         {

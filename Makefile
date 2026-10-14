@@ -52,8 +52,9 @@ export STEAMGRIDDB_API_KEY
 FEATURES ?=
 override APP_DEFINITIONS := $(strip $(addprefix FWD_FEATURE_,$(FEATURES)) $(APP_DEFINITIONS))
 PACBREW_PACKAGES ?=
-# SteamGridDB and the online AT9 conversion use libcurl.
-override PACBREW_PACKAGES := $(strip libcurl $(filter-out libcurl,$(PACBREW_PACKAGES)))
+# SteamGridDB, YouTube and the online AT9 conversion use libcurl; the
+# theme-music preview decodes YouTube's AAC with FAAD2.
+override PACBREW_PACKAGES := $(strip libcurl faad2 $(filter-out libcurl faad2,$(PACBREW_PACKAGES)))
 PACBREW_INCLUDE_PATHS ?=
 PACBREW_STATIC_ARCHIVES ?=
 PS5_HOST ?=
@@ -128,7 +129,7 @@ opengl:
 	@printf '%s\n' '==> [opengl] Preparing the ps5-opengl SDK link group'
 	@bash tools/prepare-opengl.sh
 
-.PHONY: all app build init doctor test test-deps test-unit test-integration libc deps pacbrew pacbrew-list assets-check format format-check tidy lint check ffpkg ffpfsc packages sandbox-elevation-example sandbox-elevation-ffpfsc update-check-example test-update-check test-rom-name test-settings test-features test-x360-library test-psx-library self-update-helper self-update-example test-self-update deploy undeploy clean distclean help
+.PHONY: all app build init doctor test test-deps test-unit test-integration libc deps pacbrew pacbrew-list assets-check format format-check tidy lint check ffpkg ffpfsc packages sandbox-elevation-example sandbox-elevation-ffpfsc update-check-example test-update-check test-rom-name test-settings test-features test-x360-library test-psx-library test-youtube test-at9-trim test-mp4-aac self-update-helper self-update-example test-self-update deploy undeploy clean distclean help
 
 all: app
 build: app
@@ -141,7 +142,7 @@ doctor:
 	@printf '%s\n' '==> [doctor] Checking the Linux/WSL host without changing it'
 	@bash tools/doctor.sh
 
-test: test-unit test-integration test-elevation test-update-check test-self-update test-rom-name test-settings test-features test-x360-library test-psx-library
+test: test-unit test-integration test-elevation test-update-check test-self-update test-rom-name test-settings test-features test-x360-library test-psx-library test-youtube test-at9-trim test-mp4-aac
 
 .PHONY: app-assets
 # Rebuild the app's own sce_sys presentation assets (icon0.png, pic0.dds,
@@ -205,6 +206,43 @@ test-psx-library:
 		src/fwd/forwarder.cpp src/fwd/store.cpp src/core/json.cpp build/tests/psfwd.o \
 		$(HOST_TEST_LDFLAGS) -o build/tests/test_psx_library
 	@build/tests/test_psx_library
+
+test-youtube:
+	@mkdir -p build/tests
+	@$(HOST_CXX) $(HOST_TEST_CXXFLAGS) -Isrc -g -fsanitize=address,undefined -fno-sanitize-recover=all \
+		tests/test_youtube.cpp src/net/youtube.cpp src/core/json.cpp -pthread $(HOST_TEST_LDFLAGS) \
+		-o build/tests/test_youtube
+	@build/tests/test_youtube
+
+# at9.cpp links the vendored LibAtrac9 decoder; its C sources are built
+# without the strict test flags (third-party code).
+test-at9-trim:
+	@mkdir -p build/tests/libatrac9
+	@for src in src/third_party/libatrac9/*.c; do \
+		$(HOST_CC) -std=c11 -O2 -g -fsanitize=address,undefined -c $$src \
+			-o build/tests/libatrac9/$$(basename $$src .c).o || exit 1; \
+	done
+	@$(HOST_CXX) $(HOST_TEST_CXXFLAGS) -Isrc -g -fsanitize=address,undefined -fno-sanitize-recover=all \
+		tests/test_at9_trim.cpp src/audio/at9.cpp build/tests/libatrac9/*.o $(HOST_TEST_LDFLAGS) \
+		-o build/tests/test_at9_trim
+	@build/tests/test_at9_trim
+
+# The AAC decoder test needs FAAD2 on the host: pkg-config faad2, or
+# FAAD2_DIR=<a faad2 source tree built with cmake into build/>. Without
+# either it is skipped (the app itself links PacBrew's faad2).
+FAAD2_DIR ?=
+test-mp4-aac:
+	@mkdir -p build/tests
+	@if [ -n "$(FAAD2_DIR)" ]; then \
+		flags="-I$(FAAD2_DIR)/include"; libs="$(FAAD2_DIR)/build/libfaad.a -lm"; \
+	elif pkg-config --exists faad2 2>/dev/null; then \
+		flags="$$(pkg-config --cflags faad2)"; libs="$$(pkg-config --libs faad2)"; \
+	else \
+		echo "test_mp4_aac: skipped (no FAAD2 on the host; set FAAD2_DIR)"; exit 0; \
+	fi; \
+	$(HOST_CXX) $(HOST_TEST_CXXFLAGS) -Isrc $$flags -g -fsanitize=address,undefined \
+		-fno-sanitize-recover=all tests/test_mp4_aac.cpp src/audio/mp4_aac.cpp $$libs \
+		$(HOST_TEST_LDFLAGS) -o build/tests/test_mp4_aac && build/tests/test_mp4_aac
 
 test-rom-name:
 	@mkdir -p build/tests

@@ -26,7 +26,7 @@
 #include "fwd/x360_library.hpp"
 #include "gfx/gl_batch.hpp"
 #include "gfx/renderer.hpp"
-#include "net/http.hpp"
+#include "net/at9_convert.hpp"
 #include "platform/ps5/system.hpp"
 #include "ui/components/dialog.hpp"
 #include "ui/components/form.hpp"
@@ -423,8 +423,7 @@ class EditScreen final : public Screen
         form_.add_action(RowIcon, "Tile icon").text = has_icon() ? "set" : "(required)";
         form_.add_action(RowBackground, "Backgrounds").text =
             has_background() ? "set" : "(optional)";
-        form_.add_action(RowMusic, "Selection music (.at9)").text =
-            has_music() ? "set" : "(optional)";
+        form_.add_action(RowMusic, "Selection music").text = has_music() ? "set" : "(optional)";
 
         form_.add_header("");
         form_.add_action(RowGenerate, editing_ ? "Save forwarder" : "Generate forwarder").chevron =
@@ -665,8 +664,8 @@ class EditScreen final : public Screen
         case RowMusic:
         {
             EditScreen *self = this;
-            context.push(make_file_picker_screen(
-                context, "/data", {".at9", ".mp3", ".wav", ".ogg", ".flac", ".m4a"},
+            context.push(make_music_source_screen(
+                context, forwarder_.display_name,
                 [self](const std::string &path)
                 {
                     std::vector<unsigned char> bytes;
@@ -688,6 +687,13 @@ class EditScreen final : public Screen
                                                                   ? path
                                                                   : path.substr(slash + 1));
                     }
+                },
+                [self](std::vector<unsigned char> at9)
+                {
+                    // Theme music found online arrives already converted.
+                    self->assets_.music_at9 = std::move(at9);
+                    self->dirty_ = true;
+                    self->music_dirty_ = true;
                 }));
             break;
         }
@@ -709,8 +715,6 @@ class EditScreen final : public Screen
     }
 
     // ---- online AT9 conversion (worker thread) ----------------------------
-    static constexpr const char *kConvertUrl = "https://ps5-forwarder.mph.am/api/convert-at9";
-
     void start_convert(std::vector<unsigned char> audio, std::string name)
     {
         join_convert();
@@ -743,17 +747,14 @@ class EditScreen final : public Screen
             audio = self->convert_in_;
             name = self->convert_name_;
         }
-        const net::Response response = net::post_file(kConvertUrl, "file", name, audio);
+        std::vector<unsigned char> at9;
+        std::string error;
+        const bool ok = net::convert_to_at9(audio, name, at9, error);
         std::lock_guard<std::mutex> lock(self->convert_mutex_);
-        const bool looks_at9 = response.body.size() > 12 && response.body[0] == 'R' &&
-                               response.body[1] == 'I' && response.body[2] == 'F' &&
-                               response.body[3] == 'F';
-        if (response.status == 200 && looks_at9)
-            self->convert_out_ = response.body;
-        else if (response.status == 0)
-            self->convert_error_ = response.error.empty() ? "conversion failed" : response.error;
+        if (ok)
+            self->convert_out_ = std::move(at9);
         else
-            self->convert_error_ = "conversion HTTP " + std::to_string(response.status);
+            self->convert_error_ = error;
         self->convert_done_.store(true);
         return nullptr;
     }
@@ -776,7 +777,9 @@ class EditScreen final : public Screen
         std::lock_guard<std::mutex> lock(convert_mutex_);
         if (!convert_out_.empty())
         {
-            assets_.music_at9 = std::move(convert_out_);
+            // The forwarder format holds at most ~87 s of selection music.
+            assets_.music_at9 = at9::trim(convert_out_, at9::kMaxMusicSeconds);
+            convert_out_.clear();
             dirty_ = true;
             music_dirty_ = true;
             toasts_.push(hui::ui::StatusKind::success, "Audio converted to ATRAC9");

@@ -28,11 +28,23 @@ struct Response
 // "Authorization: Bearer <bearer>". Follows redirects (https only).
 Response get(const std::string &url, const std::string &bearer = {}, long timeout_ms = 20000);
 
+// A blocking HTTPS GET of bytes [offset, offset + length) of a file: it asks
+// the server for just that range and stops reading at its end if the server
+// sends the whole file anyway (status is then 200, else 206). Made for large
+// downloads in chunks: rather than a fixed deadline, it gives up when the
+// transfer stalls (under 1 KB/s for stall_ms) or after timeout_ms in all.
+Response get_range(const std::string &url, std::size_t offset, std::size_t length,
+                   long timeout_ms = 120000, long stall_ms = 20000);
+
 // A multipart/form-data POST of one file field. field is the form field name,
 // filename the upload filename, data the file bytes. For the forwarder site's
 // /api/convert-at9 endpoint. Blocking; worker thread only.
 Response post_file(const std::string &url, const std::string &field, const std::string &filename,
                    const std::vector<unsigned char> &data, long timeout_ms = 60000);
+
+// An HTTPS POST of a JSON body ("Content-Type: application/json"), as
+// YouTube's InnerTube API takes. Blocking; worker thread only.
+Response post_json(const std::string &url, const std::string &body, long timeout_ms = 20000);
 
 // A raw POST of a byte body (http or https). Dev-only: used to ship debug
 // screenshots to the build host, which has no TLS. Blocking; worker/dev use.

@@ -1,4 +1,4 @@
-// ps5fwdgen - Choose where a tile icon or background comes from.
+// ps5fwdgen - Choose where a tile icon, background or music comes from.
 // Copyright (C) 2026 heydemoura
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
@@ -12,11 +12,14 @@
 //   - a Banner warns, and the SteamGridDB card is disabled, when the build
 //     has no SteamGridDB key.
 // The screen's own subtitle says what the picture becomes on the console.
+// For music the online card searches YouTube for theme music instead (see
+// music_search_screen) and the file card lists audio files.
 
 #include "app/screens/art_screen.hpp"
 
 #include "app/context.hpp"
 #include "app/screens/file_picker_screen.hpp"
+#include "app/screens/music_search_screen.hpp"
 #include "app/screens/steamgriddb_screen.hpp"
 #include "fwd/image.hpp"
 #include "ui/components/badge.hpp"
@@ -58,7 +61,7 @@ bool read_whole(const std::string &path, std::vector<unsigned char> &out)
 
 enum Source
 {
-    kSteamGridDb = 0,
+    kSteamGridDb = 0, // the online source (theme music search for music)
     kFile = 1,
 };
 
@@ -73,18 +76,22 @@ class ArtScreen final : public Screen
 {
   public:
     ArtScreen(Context &context, ArtKind kind, std::string suggested,
-              std::function<void(std::vector<unsigned char>)> on_ready)
+              std::function<void(std::vector<unsigned char>)> on_ready,
+              std::function<void(std::string)> on_file = {})
         : kind_(kind), suggested_(std::move(suggested)), on_ready_(std::move(on_ready)),
-          has_key_(!context.settings.steamgriddb_key.empty())
+          on_file_(std::move(on_file)),
+          has_key_(kind == ArtKind::music || !context.settings.steamgriddb_key.empty())
     {
         restyle(context);
         const float shift = has_key_ ? 0.0f : kBannerShift;
 
         // The two source cards.
         std::vector<hui::ui::CardItem> items(2);
-        items[kSteamGridDb].title = "Search SteamGridDB";
+        items[kSteamGridDb].title =
+            kind_ == ArtKind::music ? "Search theme music" : "Search SteamGridDB";
         items[kSteamGridDb].disabled = !has_key_;
-        items[kFile].title = "Choose an image file";
+        items[kFile].title =
+            kind_ == ArtKind::music ? "Choose an audio file" : "Choose an image file";
         cards_.set_items(std::move(items));
         cards_.set_bounds({kCards.x, kCards.y + shift, kCards.w, kCards.h});
         cards_.set_focus(has_key_ ? kSteamGridDb : kFile, true);
@@ -156,6 +163,11 @@ class ArtScreen final : public Screen
     // ---- what each source is -----------------------------------------------------
     const char *pitch(int index) const
     {
+        if (kind_ == ArtKind::music)
+            return index == kSteamGridDb
+                       ? "Finds a game's theme on YouTube by name, the way SDH-GameThemeMusic "
+                         "does on the Steam Deck."
+                       : "An AT9 file, or MP3, WAV, OGG, FLAC or M4A audio converted online.";
         if (index == kSteamGridDb)
             return kind_ == ArtKind::icon
                        ? "Community-made square grids for thousands of games, found by name."
@@ -170,7 +182,23 @@ class ArtScreen final : public Screen
             return;
         shown_how_ = source;
         std::vector<hui::ui::DetailItem> rows;
-        if (source == kSteamGridDb)
+        if (kind_ == ArtKind::music && source == kSteamGridDb)
+        {
+            rows.push_back({"1  Search", "Type the game's name; its theme music is found "
+                                         "first."});
+            rows.push_back({"2  Browse", "Pick a video from YouTube's results."});
+            rows.push_back({"3  Use", "Its first 85 seconds are converted to ATRAC9 and loop "
+                                      "on the tile."});
+        }
+        else if (kind_ == ArtKind::music)
+        {
+            rows.push_back(
+                {"1  Copy", "Put the audio anywhere under /data, for example with FTP."});
+            rows.push_back({"2  Find", "Browse to it in the file picker; only audio is listed."});
+            rows.push_back({"3  Use", "AT9 is used as is; other formats (2 MB at most) are "
+                                      "converted online."});
+        }
+        else if (source == kSteamGridDb)
         {
             rows.push_back({"1  Search", "Type the game's name; the forwarder's name is filled in "
                                          "for you."});
@@ -194,6 +222,13 @@ class ArtScreen final : public Screen
     // ---- results -----------------------------------------------------------------------
     void finish_from_file(Context &context, const std::string &path)
     {
+        if (kind_ == ArtKind::music)
+        {
+            if (on_file_)
+                on_file_(path);
+            done_ = true;
+            return;
+        }
         std::vector<unsigned char> raw;
         if (!read_whole(path, raw) || raw.empty())
         {
@@ -237,7 +272,17 @@ class ArtScreen final : public Screen
         if (event == hui::ui::Event::activated)
         {
             ArtScreen *self = this;
-            if (cards_.focus() == kSteamGridDb)
+            if (cards_.focus() == kSteamGridDb && kind_ == ArtKind::music)
+            {
+                context.push(make_music_search_screen(context, suggested_,
+                                                      [self](std::vector<unsigned char> at9)
+                                                      {
+                                                          if (self->on_ready_)
+                                                              self->on_ready_(std::move(at9));
+                                                          self->done_ = true;
+                                                      }));
+            }
+            else if (cards_.focus() == kSteamGridDb)
             {
                 context.push(make_steamgriddb_screen(
                     context, kind_, suggested_, [self, &context](std::vector<unsigned char> raw)
@@ -245,10 +290,13 @@ class ArtScreen final : public Screen
             }
             else
             {
-                context.push(make_file_picker_screen(context, "/data",
-                                                     {".png", ".jpg", ".jpeg", ".bmp"},
-                                                     [self, &context](const std::string &path)
-                                                     { self->finish_from_file(context, path); }));
+                context.push(make_file_picker_screen(
+                    context, "/data",
+                    kind_ == ArtKind::music
+                        ? std::vector<std::string>{".at9", ".mp3", ".wav", ".ogg", ".flac", ".m4a"}
+                        : std::vector<std::string>{".png", ".jpg", ".jpeg", ".bmp"},
+                    [self, &context](const std::string &path)
+                    { self->finish_from_file(context, path); }));
             }
         }
         refresh_how();
@@ -270,6 +318,36 @@ class ArtScreen final : public Screen
         list.rounded_rect(box, 24.0f, tint);
         const float cx = box.cx();
         const float cy = box.cy();
+        if (kind_ == ArtKind::music)
+        {
+            if (index == kSteamGridDb)
+            {
+                // Sound waves rising from a disc...
+                for (int i = 0; i < 5; ++i)
+                {
+                    const float h = 18.0f + 34.0f * static_cast<float>((i * 3 + 1) % 5) / 4.0f;
+                    list.rounded_rect(
+                        {cx - 52.0f + static_cast<float>(i) * 16.0f, cy - h * 0.5f - 8.0f, 9.0f, h},
+                        4.5f, ink.with_alpha(i == 2 ? 0.9f : 0.4f));
+                }
+                // ...and a magnifier over them.
+                list.circle(cx + 22.0f, cy + 18.0f, 22.0f, tint);
+                list.arc(cx + 22.0f, cy + 18.0f, 17.0f, 6.0f, 0.0f, 6.2831853f, ink);
+                list.rotated_rect({cx + 32.0f, cy + 38.0f, 24.0f, 8.0f}, 4.0f, 0.7854f, ink);
+            }
+            else
+            {
+                // A folder holding a note.
+                list.rounded_rect({cx - 46.0f, cy - 34.0f, 40.0f, 16.0f}, 5.0f,
+                                  ink.with_alpha(0.55f));
+                list.rounded_rect({cx - 46.0f, cy - 24.0f, 92.0f, 64.0f}, 9.0f,
+                                  ink.with_alpha(0.8f));
+                list.circle(cx - 8.0f, cy + 20.0f, 10.0f, tint);
+                list.rounded_rect({cx - 1.0f, cy - 14.0f, 5.0f, 34.0f}, 2.5f, tint);
+                list.rotated_rect({cx + 1.0f, cy - 12.0f, 20.0f, 6.0f}, 3.0f, 0.6f, tint);
+            }
+            return;
+        }
         if (index == kSteamGridDb)
         {
             // Four covers...
@@ -337,10 +415,14 @@ class ArtScreen final : public Screen
                            32.0f, theme.text_muted, 3);
 
         // What the source needs, as chips along the bottom.
+        const bool music = kind_ == ArtKind::music;
         const std::array<const char *, 2> labels =
             index == kSteamGridDb
-                ? std::array<const char *, 2>{"Needs internet", "Searches by game name"}
-                : std::array<const char *, 2>{"Works offline", "PNG, JPEG or BMP"};
+                ? std::array<const char *, 2>{"Needs internet",
+                                              music ? "Searches YouTube" : "Searches by game name"}
+                : std::array<const char *, 2>{music ? "AT9 works offline" : "Works offline",
+                                              music ? "AT9, MP3, WAV, OGG, FLAC"
+                                                    : "PNG, JPEG or BMP"};
         float x = cell.x + pad;
         const float y = cell.y + cell.h - pad - 36.0f;
         for (int c = 0; c < 2; ++c)
@@ -370,14 +452,18 @@ class ArtScreen final : public Screen
         const Color muted =
             theme.page_text_muted.a > 0.0f ? theme.page_text_muted : theme.text_muted;
         hui::ui::text(scene.list, context.fonts.display,
-                      kind_ == ArtKind::icon ? "Where should the icon come from?"
-                                             : "Where should the background come from?",
+                      kind_ == ArtKind::icon         ? "Where should the icon come from?"
+                      : kind_ == ArtKind::background ? "Where should the background come from?"
+                                                     : "Where should the music come from?",
                       kMargin, 150.0f, 46.0f, text);
         hui::ui::text(scene.list, context.fonts.regular,
                       kind_ == ArtKind::icon
                           ? "The tile's picture on the home screen, saved as a 512x512 PNG."
-                          : "Shown behind the tile and while it launches, saved as a 1920x1080 "
-                            "BC7 image.",
+                      : kind_ == ArtKind::background
+                          ? "Shown behind the tile and while it launches, saved as a 1920x1080 "
+                            "BC7 image."
+                          : "Loops while the tile is selected on the home screen, saved as "
+                            "ATRAC9 (snd0.at9).",
                       kMargin, 206.0f, 26.0f, muted);
         if (banner_.visible())
             banner_.draw(scene);
@@ -402,6 +488,7 @@ class ArtScreen final : public Screen
     ArtKind kind_;
     std::string suggested_;
     std::function<void(std::vector<unsigned char>)> on_ready_;
+    std::function<void(std::string)> on_file_; // music: the picked audio file
     bool has_key_;
     bool done_ = false;
     int shown_how_ = -1;
@@ -420,6 +507,15 @@ std::unique_ptr<Screen> make_art_screen(Context &context, ArtKind kind, std::str
 {
     return std::make_unique<ArtScreen>(context, kind, std::move(suggested_query),
                                        std::move(on_ready));
+}
+
+std::unique_ptr<Screen>
+make_music_source_screen(Context &context, std::string suggested_query,
+                         std::function<void(std::string)> on_file,
+                         std::function<void(std::vector<unsigned char>)> on_at9)
+{
+    return std::make_unique<ArtScreen>(context, ArtKind::music, std::move(suggested_query),
+                                       std::move(on_at9), std::move(on_file));
 }
 
 } // namespace fwd
